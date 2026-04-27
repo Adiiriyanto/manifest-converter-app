@@ -5,7 +5,7 @@ from io import BytesIO
 
 st.set_page_config(layout="wide")
 
-st.title("✈️ Manifest TXT → Table + Summary (Transit = TR.ORG)")
+st.title("✈️ Manifest TXT → Table + Summary (FINAL TR.ORG FIX)")
 
 # =========================
 # UPLOAD
@@ -64,23 +64,18 @@ if file:
                 weight = int(weight) if weight.isdigit() else 0
 
                 # =========================
-                # 🔥 AMBIL TR.ORG (INDEX DINAMIS)
+                # 🔥 AMBIL TR.ORG + CLEAN
                 # =========================
-                tr_org = ""
-                if len(parts) >= 10:
-                    tr_org = parts[9].strip()
+                tr_org = parts[9].strip() if len(parts) >= 10 else ""
 
-                # bersihkan nilai kosong
-                if tr_org in ["", "...", "....", "....."]:
-                    tr_org = ""
+                # hapus titik (placeholder kosong)
+                tr_org_clean = re.sub(r'\.+', '', tr_org)
 
-                # =========================
-                # 🔥 LOGIC TRANSIT BARU
-                # =========================
-                is_transit = True if tr_org != "" else False
+                # LOGIC TRANSIT FINAL
+                is_transit = True if tr_org_clean != "" else False
 
                 # =========================
-                # DETEKSI NEXT FLIGHT (OPSIONAL)
+                # NEXT FLIGHT (INFO TAMBAHAN)
                 # =========================
                 flights_found = re.findall(r'[A-Z]{2,3}\d{3,4}', line)
                 flights_found = [f for f in flights_found if f != main_flight]
@@ -88,7 +83,7 @@ if file:
                 next_flight = flights_found[0] if len(flights_found) > 0 else ""
 
                 # =========================
-                # 🔥 DETEKSI TIPE PAX
+                # TIPE PAX
                 # =========================
                 is_infant = "INF" in line
                 is_child = "CHD" in line
@@ -109,7 +104,7 @@ if file:
                     "Bagasi": bag,
                     "Berat": weight,
                     "Transit": "YA" if is_transit else "TIDAK",
-                    "TR.ORG": tr_org,
+                    "TR.ORG": tr_org_clean,
                     "Next Flight": next_flight,
                     "Flight": main_flight,
                     "Tanggal": date,
@@ -195,7 +190,7 @@ if file:
     st.download_button(
         "⬇️ Download Excel",
         data=output.getvalue(),
-        file_name="manifest_TRORG.xlsx",
+        file_name="manifest_TRORG_final.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
