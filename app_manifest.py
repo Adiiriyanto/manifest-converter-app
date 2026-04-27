@@ -5,8 +5,11 @@ from io import BytesIO
 
 st.set_page_config(layout="wide")
 
-st.title("✈️ Manifest TXT → Table + Summary (TR.ORG FINAL FIX 100%)")
+st.title("✈️ Manifest TXT → Table + Summary (FINAL TR.ORG FIX)")
 
+# =========================
+# UPLOAD
+# =========================
 file = st.file_uploader("Upload File Manifest (.txt)", type=["txt"])
 
 if file:
@@ -14,7 +17,9 @@ if file:
     text = file.read().decode("utf-8", errors="ignore")
     lines = text.split("\n")
 
+    # =========================
     # HEADER
+    # =========================
     flight_match = re.search(r'FLIGHT:\s*([A-Z]{2,3}\s*\d+)', text)
     date_match = re.search(r'DATE:\s*(\S+)', text)
     origin_match = re.search(r'PT.OF EMBARKATION:\s*(\S+)', text)
@@ -27,6 +32,9 @@ if file:
 
     st.info(f"Flight: {main_flight} | Date: {date} | {origin} → {dest}")
 
+    # =========================
+    # PARSING
+    # =========================
     data = []
 
     for line in lines:
@@ -36,53 +44,53 @@ if file:
             try:
                 parts = line.split("/")
 
-                # NAMA
+                # ===== NAMA =====
                 nama = parts[0].split()
                 lname = nama[1] if len(nama) > 1 else ""
                 fname = nama[0]
 
-                # JENIS
+                # ===== JENIS =====
                 gender = parts[2].replace(".", "").strip()
 
-                # SEAT
+                # ===== SEAT =====
                 seat = parts[3]
 
-                # BAGASI
+                # ===== BAGASI =====
                 bag = parts[4].replace(".", "")
                 bag = int(bag) if bag.isdigit() else 0
 
-                # BERAT
+                # ===== BERAT =====
                 weight = parts[5].replace(".", "")
                 weight = int(weight) if weight.isdigit() else 0
 
                 # =========================
-                # 🔥 AMBIL 4 KOLOM TERAKHIR (KUNCI UTAMA)
+                # 🔥 AMBIL TR.ORG + CLEAN
                 # =========================
-                tail = parts[-4:] if len(parts) >= 4 else ["","","",""]
+                tr_org = parts[9].strip() if len(parts) >= 10 else ""
 
-                in_flt = tail[0]
-                tr_org = tail[1]
-                ot_flt = tail[2]
-                f_dst = tail[3]
-
-                # CLEAN TR.ORG
+                # hapus titik (placeholder kosong)
                 tr_org_clean = re.sub(r'\.+', '', tr_org)
 
-                # VALIDASI TAMBAHAN (ANTI SALAH KOLOM)
-                is_flight_code = bool(re.match(r'^[A-Z]{2,3}\d{3,4}$', tr_org_clean))
+                # LOGIC TRANSIT FINAL
+                is_transit = True if tr_org_clean != "" else False
 
-                if tr_org_clean != "" and not is_flight_code:
-                    is_transit = True
-                else:
-                    is_transit = False
+                # =========================
+                # NEXT FLIGHT (INFO TAMBAHAN)
+                # =========================
+                flights_found = re.findall(r'[A-Z]{2,3}\d{3,4}', line)
+                flights_found = [f for f in flights_found if f != main_flight]
 
-                # NEXT FLIGHT
-                next_flight = ot_flt if re.search(r'[A-Z]{2,3}\d{3,4}', ot_flt) else ""
+                next_flight = flights_found[0] if len(flights_found) > 0 else ""
 
+                # =========================
                 # TIPE PAX
-                if "INF" in line:
+                # =========================
+                is_infant = "INF" in line
+                is_child = "CHD" in line
+
+                if is_infant:
                     pax_type = "INF"
-                elif "CHD" in line:
+                elif is_child:
                     pax_type = "CHD"
                 else:
                     pax_type = "ADT"
@@ -109,33 +117,82 @@ if file:
 
     df = pd.DataFrame(data)
 
+    if df.empty:
+        st.warning("Data tidak terbaca, cek format manifest")
+        st.stop()
+
     # =========================
     # SUMMARY
+    # =========================
+    total = len(df)
+    adult = len(df[df["Tipe Pax"] == "ADT"])
+    child = len(df[df["Tipe Pax"] == "CHD"])
+    infant = len(df[df["Tipe Pax"] == "INF"])
+
+    male = len(df[df["Jenis"] == "M"])
+    female = len(df[df["Jenis"] == "F"])
+
+    transit = len(df[df["Transit"] == "YA"])
+    non_transit = len(df[df["Transit"] == "TIDAK"])
+
+    bagasi = df["Bagasi"].sum()
+    berat = df["Berat"].sum()
+
+    # =========================
+    # KPI
     # =========================
     st.subheader("📊 Summary")
 
     c1,c2,c3,c4,c5,c6 = st.columns(6)
 
-    c1.metric("Total Pax", len(df))
-    c2.metric("Adult", len(df[df["Tipe Pax"]=="ADT"]))
-    c3.metric("Child", len(df[df["Tipe Pax"]=="CHD"]))
-    c4.metric("Infant", len(df[df["Tipe Pax"]=="INF"]))
-    c5.metric("Transit", len(df[df["Transit"]=="YA"]))
-    c6.metric("Non Transit", len(df[df["Transit"]=="TIDAK"]))
+    c1.metric("Total Pax", total)
+    c2.metric("Adult", adult)
+    c3.metric("Child", child)
+    c4.metric("Infant", infant)
+    c5.metric("Transit", transit)
+    c6.metric("Non Transit", non_transit)
 
-    st.metric("Bagasi", df["Bagasi"].sum())
-    st.metric("Berat", df["Berat"].sum())
+    c7,c8 = st.columns(2)
+    c7.metric("Bagasi", bagasi)
+    c8.metric("Total Berat", berat)
 
+    # =========================
+    # TABLE
+    # =========================
     st.subheader("📋 Data Penumpang")
     st.dataframe(df, use_container_width=True)
 
-    # EXPORT
+    # =========================
+    # EXPORT EXCEL
+    # =========================
     output = BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False)
 
-    st.download_button("⬇️ Download Excel", data=output.getvalue(),
-                       file_name="manifest_final_fix.xlsx")
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='DATA')
+
+        summary = pd.DataFrame({
+            "Kategori": [
+                "Total Pax","Adult","Child","Infant",
+                "Male","Female",
+                "Transit","Non Transit",
+                "Bagasi","Berat"
+            ],
+            "Jumlah": [
+                total,adult,child,infant,
+                male,female,
+                transit,non_transit,
+                bagasi,berat
+            ]
+        })
+
+        summary.to_excel(writer, index=False, sheet_name='SUMMARY')
+
+    st.download_button(
+        "⬇️ Download Excel",
+        data=output.getvalue(),
+        file_name="manifest_TRORG_final.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 else:
     st.info("Upload file manifest TXT untuk mulai")
