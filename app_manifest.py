@@ -5,7 +5,7 @@ from io import BytesIO
 
 st.set_page_config(layout="wide")
 
-st.title("✈️ Manifest TXT → Table + Summary (Transit Akurat)")
+st.title("✈️ Manifest TXT → Table + Summary (FINAL ALL FIX)")
 
 # =========================
 # UPLOAD
@@ -64,11 +64,9 @@ if file:
                 weight = int(weight) if weight.isdigit() else 0
 
                 # =========================
-                # 🔥 DETEKSI TRANSIT AKURAT
+                # 🔥 DETEKSI TRANSIT (AKURAT)
                 # =========================
                 flights_found = re.findall(r'[A-Z]{2,3}\d{3,4}', line)
-
-                # buang flight utama
                 flights_found = [f for f in flights_found if f != main_flight]
 
                 if len(flights_found) > 0:
@@ -78,17 +76,27 @@ if file:
                     is_transit = False
                     next_flight = ""
 
-                # infant
-                infant = "INF" in line
+                # =========================
+                # 🔥 DETEKSI TIPE PAX
+                # =========================
+                is_infant = "INF" in line
+                is_child = "CHD" in line
+
+                if is_infant:
+                    pax_type = "INF"
+                elif is_child:
+                    pax_type = "CHD"
+                else:
+                    pax_type = "ADT"
 
                 data.append({
                     "Nama Depan": fname,
                     "Nama Belakang": lname,
                     "Jenis": gender,
+                    "Tipe Pax": pax_type,
                     "Seat": seat,
                     "Bagasi": bag,
                     "Berat": weight,
-                    "Infant": 1 if infant else 0,
                     "Transit": "YA" if is_transit else "TIDAK",
                     "Next Flight": next_flight,
                     "Flight": main_flight,
@@ -109,17 +117,19 @@ if file:
     # =========================
     # SUMMARY
     # =========================
+    total = len(df)
+    adult = len(df[df["Tipe Pax"] == "ADT"])
+    child = len(df[df["Tipe Pax"] == "CHD"])
+    infant = len(df[df["Tipe Pax"] == "INF"])
+
     male = len(df[df["Jenis"] == "M"])
     female = len(df[df["Jenis"] == "F"])
-    infant = df["Infant"].sum()
 
     transit = len(df[df["Transit"] == "YA"])
     non_transit = len(df[df["Transit"] == "TIDAK"])
 
     bagasi = df["Bagasi"].sum()
     berat = df["Berat"].sum()
-
-    total = len(df)
 
     # =========================
     # KPI
@@ -129,14 +139,15 @@ if file:
     c1,c2,c3,c4,c5,c6 = st.columns(6)
 
     c1.metric("Total Pax", total)
-    c2.metric("Male", male)
-    c3.metric("Female", female)
+    c2.metric("Adult", adult)
+    c3.metric("Child", child)
     c4.metric("Infant", infant)
     c5.metric("Transit", transit)
     c6.metric("Non Transit", non_transit)
 
-    st.metric("Bagasi", bagasi)
-    st.metric("Total Berat", berat)
+    c7,c8 = st.columns(2)
+    c7.metric("Bagasi", bagasi)
+    c8.metric("Total Berat", berat)
 
     # =========================
     # TABLE
@@ -145,7 +156,7 @@ if file:
     st.dataframe(df, use_container_width=True)
 
     # =========================
-    # DOWNLOAD EXCEL
+    # EXPORT EXCEL
     # =========================
     output = BytesIO()
 
@@ -154,12 +165,16 @@ if file:
 
         summary = pd.DataFrame({
             "Kategori": [
-                "Total Pax","Male","Female","Infant",
-                "Transit","Non Transit","Bagasi","Berat"
+                "Total Pax","Adult","Child","Infant",
+                "Male","Female",
+                "Transit","Non Transit",
+                "Bagasi","Berat"
             ],
             "Jumlah": [
-                total,male,female,infant,
-                transit,non_transit,bagasi,berat
+                total,adult,child,infant,
+                male,female,
+                transit,non_transit,
+                bagasi,berat
             ]
         })
 
@@ -168,7 +183,7 @@ if file:
     st.download_button(
         "⬇️ Download Excel",
         data=output.getvalue(),
-        file_name="manifest_transit_final.xlsx",
+        file_name="manifest_final.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
