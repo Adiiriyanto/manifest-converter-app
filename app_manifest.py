@@ -5,7 +5,7 @@ from io import BytesIO
 
 st.set_page_config(layout="wide")
 
-st.title("✈️ Manifest TXT → Table + Summary (FINAL ALL FIX)")
+st.title("✈️ Manifest Reader")
 
 # =========================
 # UPLOAD
