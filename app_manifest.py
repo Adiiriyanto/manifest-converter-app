@@ -5,7 +5,7 @@ from io import BytesIO
 
 st.set_page_config(layout="wide")
 
-st.title("✈️ Manifest Reader")
+st.title("✈️ Manifest TXT → Table + Summary (Transit = TR.ORG)")
 
 # =========================
 # UPLOAD
@@ -64,17 +64,28 @@ if file:
                 weight = int(weight) if weight.isdigit() else 0
 
                 # =========================
-                # 🔥 DETEKSI TRANSIT (AKURAT)
+                # 🔥 AMBIL TR.ORG (INDEX DINAMIS)
+                # =========================
+                tr_org = ""
+                if len(parts) >= 10:
+                    tr_org = parts[9].strip()
+
+                # bersihkan nilai kosong
+                if tr_org in ["", "...", "....", "....."]:
+                    tr_org = ""
+
+                # =========================
+                # 🔥 LOGIC TRANSIT BARU
+                # =========================
+                is_transit = True if tr_org != "" else False
+
+                # =========================
+                # DETEKSI NEXT FLIGHT (OPSIONAL)
                 # =========================
                 flights_found = re.findall(r'[A-Z]{2,3}\d{3,4}', line)
                 flights_found = [f for f in flights_found if f != main_flight]
 
-                if len(flights_found) > 0:
-                    is_transit = True
-                    next_flight = flights_found[0]
-                else:
-                    is_transit = False
-                    next_flight = ""
+                next_flight = flights_found[0] if len(flights_found) > 0 else ""
 
                 # =========================
                 # 🔥 DETEKSI TIPE PAX
@@ -98,6 +109,7 @@ if file:
                     "Bagasi": bag,
                     "Berat": weight,
                     "Transit": "YA" if is_transit else "TIDAK",
+                    "TR.ORG": tr_org,
                     "Next Flight": next_flight,
                     "Flight": main_flight,
                     "Tanggal": date,
@@ -183,7 +195,7 @@ if file:
     st.download_button(
         "⬇️ Download Excel",
         data=output.getvalue(),
-        file_name="manifest_final.xlsx",
+        file_name="manifest_TRORG.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
