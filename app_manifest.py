@@ -5,7 +5,7 @@ from io import BytesIO
 
 st.set_page_config(layout="wide")
 
-st.title("✈️ Manifest TXT → Table + Summary (Transit Enabled)")
+st.title("✈️ Manifest TXT → Table + Summary (Transit Akurat)")
 
 # =========================
 # UPLOAD
@@ -18,22 +18,22 @@ if file:
     lines = text.split("\n")
 
     # =========================
-    # HEADER INFO
+    # HEADER
     # =========================
-    flight = re.search(r'FLIGHT:\s*(\S+\s*\d+)', text)
-    date = re.search(r'DATE:\s*(\S+)', text)
-    origin = re.search(r'PT.OF EMBARKATION:\s*(\S+)', text)
-    dest = re.search(r'PT.OF DEST:\s*(\S+)', text)
+    flight_match = re.search(r'FLIGHT:\s*([A-Z]{2,3}\s*\d+)', text)
+    date_match = re.search(r'DATE:\s*(\S+)', text)
+    origin_match = re.search(r'PT.OF EMBARKATION:\s*(\S+)', text)
+    dest_match = re.search(r'PT.OF DEST:\s*(\S+)', text)
 
-    flight = flight.group(1) if flight else ""
-    date = date.group(1) if date else ""
-    origin = origin.group(1) if origin else ""
-    dest = dest.group(1) if dest else ""
+    main_flight = flight_match.group(1).replace(" ", "") if flight_match else ""
+    date = date_match.group(1) if date_match else ""
+    origin = origin_match.group(1) if origin_match else ""
+    dest = dest_match.group(1) if dest_match else ""
 
-    st.info(f"Flight: {flight} | Date: {date} | {origin} → {dest}")
+    st.info(f"Flight: {main_flight} | Date: {date} | {origin} → {dest}")
 
     # =========================
-    # PARSING DATA
+    # PARSING
     # =========================
     data = []
 
@@ -55,23 +55,28 @@ if file:
                 # ===== SEAT =====
                 seat = parts[3]
 
-                # ===== BAG =====
+                # ===== BAGASI =====
                 bag = parts[4].replace(".", "")
                 bag = int(bag) if bag.isdigit() else 0
 
-                # ===== WEIGHT =====
+                # ===== BERAT =====
                 weight = parts[5].replace(".", "")
                 weight = int(weight) if weight.isdigit() else 0
 
                 # =========================
-                # 🔥 TRANSIT DETECTION
+                # 🔥 DETEKSI TRANSIT AKURAT
                 # =========================
-                # OT.FLT biasanya di posisi ke-10 atau ke-11
-                ot_flight = ""
-                if len(parts) >= 11:
-                    ot_flight = parts[10].strip()
+                flights_found = re.findall(r'[A-Z]{2,3}\d{3,4}', line)
 
-                is_transit = ot_flight not in ["", "....", "..."]
+                # buang flight utama
+                flights_found = [f for f in flights_found if f != main_flight]
+
+                if len(flights_found) > 0:
+                    is_transit = True
+                    next_flight = flights_found[0]
+                else:
+                    is_transit = False
+                    next_flight = ""
 
                 # infant
                 infant = "INF" in line
@@ -85,11 +90,11 @@ if file:
                     "Berat": weight,
                     "Infant": 1 if infant else 0,
                     "Transit": "YA" if is_transit else "TIDAK",
-                    "Flight": flight,
+                    "Next Flight": next_flight,
+                    "Flight": main_flight,
                     "Tanggal": date,
                     "Asal": origin,
-                    "Tujuan": dest,
-                    "Next Flight": ot_flight
+                    "Tujuan": dest
                 })
 
             except:
@@ -163,7 +168,7 @@ if file:
     st.download_button(
         "⬇️ Download Excel",
         data=output.getvalue(),
-        file_name="manifest_transit.xlsx",
+        file_name="manifest_transit_final.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
