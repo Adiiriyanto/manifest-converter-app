@@ -5,7 +5,7 @@ from io import BytesIO
 
 st.set_page_config(layout="wide")
 
-st.title("✈️ Manifest TXT → Table + Summary (FINAL FIX STABLE)")
+st.title("✈️ Manifest TXT → Table + Summary (FINAL TR.ORG FIX)")
 
 # =========================
 # UPLOAD
@@ -64,29 +64,23 @@ if file:
                 weight = int(weight) if weight.isdigit() else 0
 
                 # =========================
-                # 🔥 AMBIL 4 KOLOM TERAKHIR (FIX UTAMA)
+                # 🔥 AMBIL TR.ORG + CLEAN
                 # =========================
-                tail = parts[-4:] if len(parts) >= 4 else ["","","",""]
+                tr_org = parts[9].strip() if len(parts) >= 10 else ""
 
-                in_flt = tail[0]
-                tr_org = tail[1]
-                ot_flt = tail[2]
-                f_dst = tail[3]
-
-                # =========================
-                # 🔥 CLEAN DATA
-                # =========================
+                # hapus titik (placeholder kosong)
                 tr_org_clean = re.sub(r'\.+', '', tr_org)
 
-                # =========================
-                # 🔥 LOGIC TRANSIT FINAL
-                # =========================
+                # LOGIC TRANSIT FINAL
                 is_transit = True if tr_org_clean != "" else False
 
                 # =========================
-                # NEXT FLIGHT
+                # NEXT FLIGHT (INFO TAMBAHAN)
                 # =========================
-                next_flight = ot_flt if re.search(r'[A-Z]{2,3}\d{3,4}', ot_flt) else ""
+                flights_found = re.findall(r'[A-Z]{2,3}\d{3,4}', line)
+                flights_found = [f for f in flights_found if f != main_flight]
+
+                next_flight = flights_found[0] if len(flights_found) > 0 else ""
 
                 # =========================
                 # TIPE PAX
@@ -196,7 +190,7 @@ if file:
     st.download_button(
         "⬇️ Download Excel",
         data=output.getvalue(),
-        file_name="manifest_FINAL_FIX.xlsx",
+        file_name="manifest_TRORG_final.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
