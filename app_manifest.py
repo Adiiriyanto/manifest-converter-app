@@ -5,7 +5,7 @@ from io import BytesIO
 
 st.set_page_config(layout="wide")
 
-st.title("✈️ Manifest TXT → Table + Summary (TR.ORG SMART FIX)")
+st.title("✈️ Manifest TXT → Table + Summary (TR.ORG FINAL FIX 100%)")
 
 file = st.file_uploader("Upload File Manifest (.txt)", type=["txt"])
 
@@ -56,26 +56,28 @@ if file:
                 weight = int(weight) if weight.isdigit() else 0
 
                 # =========================
-                # 🔥 TR.ORG FIX CERDAS
+                # 🔥 AMBIL 4 KOLOM TERAKHIR (KUNCI UTAMA)
                 # =========================
-                tr_org_raw = parts[9].strip() if len(parts) >= 10 else ""
+                tail = parts[-4:] if len(parts) >= 4 else ["","","",""]
 
-                # bersihkan titik
-                tr_org_clean = re.sub(r'\.+', '', tr_org_raw)
+                in_flt = tail[0]
+                tr_org = tail[1]
+                ot_flt = tail[2]
+                f_dst = tail[3]
 
-                # DETEKSI KODE FLIGHT
+                # CLEAN TR.ORG
+                tr_org_clean = re.sub(r'\.+', '', tr_org)
+
+                # VALIDASI TAMBAHAN (ANTI SALAH KOLOM)
                 is_flight_code = bool(re.match(r'^[A-Z]{2,3}\d{3,4}$', tr_org_clean))
 
-                # LOGIC FINAL
                 if tr_org_clean != "" and not is_flight_code:
                     is_transit = True
                 else:
                     is_transit = False
 
-                # NEXT FLIGHT (info saja)
-                flights_found = re.findall(r'[A-Z]{2,3}\d{3,4}', line)
-                flights_found = [f for f in flights_found if f != main_flight]
-                next_flight = flights_found[0] if len(flights_found) > 0 else ""
+                # NEXT FLIGHT
+                next_flight = ot_flt if re.search(r'[A-Z]{2,3}\d{3,4}', ot_flt) else ""
 
                 # TIPE PAX
                 if "INF" in line:
@@ -107,53 +109,33 @@ if file:
 
     df = pd.DataFrame(data)
 
-    if df.empty:
-        st.warning("Data tidak terbaca")
-        st.stop()
-
     # =========================
     # SUMMARY
     # =========================
-    total = len(df)
-    adult = len(df[df["Tipe Pax"] == "ADT"])
-    child = len(df[df["Tipe Pax"] == "CHD"])
-    infant = len(df[df["Tipe Pax"] == "INF"])
-
-    transit = len(df[df["Transit"] == "YA"])
-    non_transit = len(df[df["Transit"] == "TIDAK"])
-
-    bagasi = df["Bagasi"].sum()
-    berat = df["Berat"].sum()
-
     st.subheader("📊 Summary")
 
     c1,c2,c3,c4,c5,c6 = st.columns(6)
 
-    c1.metric("Total Pax", total)
-    c2.metric("Adult", adult)
-    c3.metric("Child", child)
-    c4.metric("Infant", infant)
-    c5.metric("Transit", transit)
-    c6.metric("Non Transit", non_transit)
+    c1.metric("Total Pax", len(df))
+    c2.metric("Adult", len(df[df["Tipe Pax"]=="ADT"]))
+    c3.metric("Child", len(df[df["Tipe Pax"]=="CHD"]))
+    c4.metric("Infant", len(df[df["Tipe Pax"]=="INF"]))
+    c5.metric("Transit", len(df[df["Transit"]=="YA"]))
+    c6.metric("Non Transit", len(df[df["Transit"]=="TIDAK"]))
 
-    st.metric("Bagasi", bagasi)
-    st.metric("Total Berat", berat)
+    st.metric("Bagasi", df["Bagasi"].sum())
+    st.metric("Berat", df["Berat"].sum())
 
     st.subheader("📋 Data Penumpang")
     st.dataframe(df, use_container_width=True)
 
     # EXPORT
     output = BytesIO()
-
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='DATA')
+        df.to_excel(writer, index=False)
 
-    st.download_button(
-        "⬇️ Download Excel",
-        data=output.getvalue(),
-        file_name="manifest_TRORG_SMART.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    st.download_button("⬇️ Download Excel", data=output.getvalue(),
+                       file_name="manifest_final_fix.xlsx")
 
 else:
     st.info("Upload file manifest TXT untuk mulai")
